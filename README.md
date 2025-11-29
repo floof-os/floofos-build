@@ -1,3 +1,5 @@
+# FloofOS CLI
+
 ## License
 
 FloofOS is free software: you can redistribute it and/or modify
