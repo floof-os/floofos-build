@@ -1,4 +1,4 @@
-# FloofOS CLI
+# FloofOS build
 
 ## License
 
