@@ -1,17 +1,31 @@
 #!/bin/bash
 set -e
 
-# FloofOS - Fast Line-rate Offload On Fabric Operating System
-# Copyright (C) 2025 FloofOS Networks <dev@floofos.io>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License.
-
 cd /build
 
 lb clean --purge
 
-lb config
+lb config noauto \
+    --distribution bookworm \
+    --architectures amd64 \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --apt-recommends false \
+    --apt-indices false \
+    --bootappend-live "boot=live components quiet splash net.ifnames=0 biosdevname=0" \
+    --debian-installer false \
+    --iso-application "FloofOS" \
+    --iso-preparer "FloofOS Networks" \
+    --iso-publisher "https://floofos.io" \
+    --iso-volume "FloofOS" \
+    --image-name "floofos-core" \
+    --mirror-bootstrap "http://deb.debian.org/debian/" \
+    --mirror-chroot "http://deb.debian.org/debian/" \
+    --mirror-chroot-security "http://security.debian.org/debian-security/" \
+    --checksums sha256 \
+    --linux-flavours amd64 \
+    --system live \
+    --mode debian \
+    --memtest none \
+    --win32-loader false
 
 lb build

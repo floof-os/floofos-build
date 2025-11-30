@@ -1,0 +1,18 @@
+#!/bin/sh
+# Setup autologin for FloofOS live user
+
+# Create live user if not exists
+if ! id floofos >/dev/null 2>&1; then
+    useradd -m -s /bin/bash -G sudo floofos
+    echo "floofos:floofos" | chpasswd
+fi
+
+# Configure getty autologin
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin floofos --noclear %I $TERM
+EOF
+
+systemctl daemon-reload

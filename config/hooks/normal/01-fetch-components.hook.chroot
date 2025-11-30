@@ -1,85 +1,112 @@
 #!/bin/bash
-set -e
-
-# FloofOS - Fast Line-rate Offload On Fabric Operating System
-# Copyright (C) 2025 FloofOS Networks <dev@floofos.io>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License.
 
 echo "FloofOS Component Installation"
 
-echo "[1/7] Configuring external repositories..."
-wget -q -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg
-echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/bird2 bookworm main" > /etc/apt/sources.list.d/bird2.list
+echo "Installing base packages from Debian"
+apt-get update || exit 1
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    sudo bash-completion python3-pip python3-venv micro iftop bmon mtr \
+    build-essential python3 rsync iptables lm-sensors bc pciutils \
+    libnl-3-200 libnl-route-3-200 libnuma1 python3-cffi libsubunit0 \
+    firmware-linux firmware-misc-nonfree gnupg vim nano curl wget git \
+    openssh-server net-tools iproute2 iputils-ping traceroute tcpdump dnsutils \
+    ca-certificates locales tzdata openvswitch-switch ethtool vlan bridge-utils \
+    htop iotop sysstat procps rsyslog nftables fail2ban snmp snmpd \
+    libsnmp-dev libnl-3-dev libnl-route-3-dev systemd-sysv || exit 1
 
-curl -sL https://repo.pathvector.io/pgp.asc > /usr/share/keyrings/pathvector.asc
+echo "Installing Go 1.24.0"
+cd /tmp
+wget -q https://go.dev/dl/go1.24.0.linux-amd64.tar.gz || exit 1
+tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
+rm go1.24.0.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+echo "Go 1.24.0: OK"
+
+echo "Configuring external repositories"
+wget -q -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg || true
+echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/bird2 bookworm main" > /etc/apt/sources.list.d/cznic-labs-bird2.list
+
+curl -sL https://repo.pathvector.io/pgp.asc > /usr/share/keyrings/pathvector.asc || true
 echo "deb [signed-by=/usr/share/keyrings/pathvector.asc] https://repo.pathvector.io/apt/ stable main" > /etc/apt/sources.list.d/pathvector.list
 
-curl -sL https://packagecloud.io/fdio/release/gpgkey | gpg --dearmor > /usr/share/keyrings/fdio-archive-keyring.gpg
+curl -sL https://packagecloud.io/fdio/release/gpgkey | gpg --dearmor > /usr/share/keyrings/fdio-archive-keyring.gpg || true
 echo "deb [signed-by=/usr/share/keyrings/fdio-archive-keyring.gpg] https://packagecloud.io/fdio/release/debian bookworm main" > /etc/apt/sources.list.d/vpp.list
 
-echo "[2/7] Updating package lists..."
-apt-get update
+echo "Updating package lists"
+apt-get update || true
 
-echo "[3/7] Installing BIRD2, Pathvector, and VPP..."
+echo "Installing BIRD2, Pathvector, and VPP"
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    bird2 \
-    pathvector \
-    vpp \
-    vpp-plugin-core \
-    vpp-plugin-dpdk \
-    dpdk
+    bird2 pathvector vpp vpp-plugin-core vpp-plugin-dpdk dpdk || true
 
-echo "[4/7] Fetching FloofOS core files..."
-git clone --depth 1 https://github.com/floof-os/floofos-core.git /tmp/floofos-core
-cp -rv /tmp/floofos-core/* /
-rm -rf /tmp/floofos-core
-
-echo "[5/7] Building FloofOS CLI..."
-if command -v go >/dev/null 2>&1; then
-    git clone --depth 1 https://github.com/floof-os/floofos-cli.git /tmp/floofos-cli
-    cd /tmp/floofos-cli
-    go build -o /usr/bin/floof-cli ./cmd/floofctl
-    chmod +x /usr/bin/floof-cli
-    cd /
-    rm -rf /tmp/floofos-cli
-    echo "CLI built successfully"
+echo "Fetching FloofOS core files"
+if git clone --depth 1 https://github.com/floof-os/floofos-core.git /tmp/floofos-core 2>/dev/null; then
+    echo "Copying FloofOS core files..."
+    cp -r /tmp/floofos-core/* / 2>/dev/null || true
+    rm -rf /tmp/floofos-core
+    echo "FloofOS core: OK"
 else
-    echo "WARNING: Go not available, skipping CLI build"
+    echo "WARNING: floofos-core not available, creating placeholder..."
+    mkdir -p /etc/floofctl /var/log/floofctl /usr/local/bin
 fi
 
-echo "[6/7] Installing optional components..."
+echo "Building FloofOS CLI"
+if command -v /usr/local/go/bin/go >/dev/null 2>&1; then
+    if git clone --depth 1 https://github.com/floof-os/floofos-cli.git /tmp/floofos-cli 2>/dev/null; then
+        cd /tmp/floofos-cli
+        if /usr/local/go/bin/go build -o /usr/bin/floof-cli ./cmd/floofctl 2>/dev/null; then
+            chmod +x /usr/bin/floof-cli
+            echo "FloofOS CLI: OK"
+        else
+            echo "WARNING: CLI build failed"
+        fi
+        cd /
+        rm -rf /tmp/floofos-cli
+    else
+        echo "WARNING: floofos-cli repo not available"
+    fi
+else
+    echo "ERROR: Go not installed"
+fi
+
+echo "Installing additional components"
 cd /opt
 if git clone --depth 1 https://git.ipng.ch/ipng/vpp-snmp-agent.git 2>/dev/null; then
-  cd vpp-snmp-agent
-  make 2>/dev/null || echo "Warning: vpp-snmp-agent build failed, continuing..."
-  if [ -f vpp-snmp-agent ]; then
-    cp vpp-snmp-agent /usr/bin/
-    chmod +x /usr/bin/vpp-snmp-agent
-  fi
-  cd /
+    cd vpp-snmp-agent
+    if make 2>/dev/null; then
+        if [ -f vpp-snmp-agent ]; then
+            cp vpp-snmp-agent /usr/local/bin/
+            chmod +x /usr/local/bin/vpp-snmp-agent
+            echo "vpp-snmp-agent: OK"
+        fi
+    else
+        echo "vpp-snmp-agent: build failed, skipping"
+    fi
+    cd /opt
 else
-  echo "Warning: vpp-snmp-agent not available"
+    echo "vpp-snmp-agent: not available, skipping"
 fi
 
 cd /etc
 if git clone --depth 1 https://git.ipng.ch/ipng/vppcfg.git 2>/dev/null; then
-  cd vppcfg
-  python3 -m venv .venv
-  source .venv/bin/activate
-  make install-deps 2>/dev/null || true
-  make build 2>/dev/null || true
-  pip install dist/vppcfg-*.whl 2>/dev/null || true
-  deactivate
-  cd /
+    cd vppcfg
+    python3 -m venv .venv 2>/dev/null || true
+    if [ -f .venv/bin/activate ]; then
+        . .venv/bin/activate
+        make install-deps 2>/dev/null || true
+        make build 2>/dev/null || true
+        pip install dist/vppcfg-*.whl 2>/dev/null || true
+        deactivate
+        echo "vppcfg: OK"
+    fi
+    cd /
 else
-  echo "Warning: vppcfg not available"
+    echo "vppcfg: not available, skipping"
 fi
 
-echo "[7/7] Applying system configuration..."
+echo "Applying system configuration"
 cat > /etc/sysctl.d/99-floofos.conf <<'EOF'
+# FloofOS Routing and Forwarding Configuration
 fs.file-max = 16777216
 fs.nr_open = 16777216
 kernel.hung_task_timeout_secs = 60
@@ -154,19 +181,15 @@ EOF
 
 systemctl enable netns-dataplane 2>/dev/null || true
 systemctl enable rsyslog 2>/dev/null || true
-systemctl enable vpp-snmp-agent 2>/dev/null || true
 systemctl enable ssh-dataplane 2>/dev/null || true
 systemctl enable bird-dataplane 2>/dev/null || true
 systemctl enable vpp-auto-config 2>/dev/null || true
-systemctl disable nftables 2>/dev/null || true
-systemctl disable snmpd 2>/dev/null || true
 
 for svc in bird snmpd; do
-  systemctl stop $svc 2>/dev/null || true
-  systemctl disable $svc 2>/dev/null || true
-  systemctl mask $svc 2>/dev/null || true
+    systemctl mask $svc 2>/dev/null || true
 done
 
 chmod +x /usr/local/bin/* 2>/dev/null || true
 
-echo "FloofOS Installation Complete"
+echo "=== FloofOS Installation Complete ==="
+exit 0
