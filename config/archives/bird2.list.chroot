@@ -1,1 +1,0 @@
-deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/bird2 bookworm main

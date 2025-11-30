@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 # FloofOS - Fast Line-rate Offload On Fabric Operating System
@@ -9,23 +8,23 @@ set -e
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
-echo "Fetching components..."
+echo "FloofOS Component Installation"
 
-# Install keys and repos
-echo "Configuring repositories..."
-wget -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg
+echo "[1/7] Configuring external repositories..."
+wget -q -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg
 echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/bird2 bookworm main" > /etc/apt/sources.list.d/bird2.list
 
-curl -s https://repo.pathvector.io/pgp.asc > /usr/share/keyrings/pathvector.asc
+curl -sL https://repo.pathvector.io/pgp.asc > /usr/share/keyrings/pathvector.asc
 echo "deb [signed-by=/usr/share/keyrings/pathvector.asc] https://repo.pathvector.io/apt/ stable main" > /etc/apt/sources.list.d/pathvector.list
 
-curl -s https://packagecloud.io/fdio/release/gpgkey | gpg --dearmor > /usr/share/keyrings/fdio-archive-keyring.gpg
+curl -sL https://packagecloud.io/fdio/release/gpgkey | gpg --dearmor > /usr/share/keyrings/fdio-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/fdio-archive-keyring.gpg] https://packagecloud.io/fdio/release/debian bookworm main" > /etc/apt/sources.list.d/vpp.list
 
+echo "[2/7] Updating package lists..."
 apt-get update
 
-echo "Installing external packages..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
+echo "[3/7] Installing BIRD2, Pathvector, and VPP..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bird2 \
     pathvector \
     vpp \
@@ -33,72 +32,65 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     vpp-plugin-dpdk \
     dpdk
 
-git clone https://github.com/floof-os/floofos-core.git /tmp/floofos-core
-
+echo "[4/7] Fetching FloofOS core files..."
+git clone --depth 1 https://github.com/floof-os/floofos-core.git /tmp/floofos-core
 cp -rv /tmp/floofos-core/* /
-
 rm -rf /tmp/floofos-core
 
-if command -v go >/dev/null; then
-    git clone https://github.com/floof-os/floofos-cli.git /tmp/floofos-cli
+echo "[5/7] Building FloofOS CLI..."
+if command -v go >/dev/null 2>&1; then
+    git clone --depth 1 https://github.com/floof-os/floofos-cli.git /tmp/floofos-cli
     cd /tmp/floofos-cli
     go build -o /usr/bin/floof-cli ./cmd/floofctl
+    chmod +x /usr/bin/floof-cli
     cd /
     rm -rf /tmp/floofos-cli
-
-    # Pathvector installed via APT (see archives/pathvector.list.chroot)
-
-    echo "Installing vpp-snmp-agent..."
-    cd /opt
-    if git clone https://git.ipng.ch/ipng/vpp-snmp-agent.git; then
-      cd vpp-snmp-agent
-      make || true
-      cp vpp-snmp-agent /usr/bin/
-      chmod +x /usr/bin/vpp-snmp-agent
-      echo "vpp-snmp-agent installed"
-    else
-      echo "Warning: vpp-snmp-agent clone failed"
-    fi
+    echo "CLI built successfully"
 else
-    echo "Go not found, skipping CLI build."
+    echo "WARNING: Go not available, skipping CLI build"
 fi
 
-echo "Installing vppcfg..."
+echo "[6/7] Installing optional components..."
+cd /opt
+if git clone --depth 1 https://git.ipng.ch/ipng/vpp-snmp-agent.git 2>/dev/null; then
+  cd vpp-snmp-agent
+  make 2>/dev/null || echo "Warning: vpp-snmp-agent build failed, continuing..."
+  if [ -f vpp-snmp-agent ]; then
+    cp vpp-snmp-agent /usr/bin/
+    chmod +x /usr/bin/vpp-snmp-agent
+  fi
+  cd /
+else
+  echo "Warning: vpp-snmp-agent not available"
+fi
+
 cd /etc
-if git clone https://git.ipng.ch/ipng/vppcfg.git; then
+if git clone --depth 1 https://git.ipng.ch/ipng/vppcfg.git 2>/dev/null; then
   cd vppcfg
   python3 -m venv .venv
   source .venv/bin/activate
-  make install-deps || true
-  make build || true
-  pip install dist/vppcfg-*.whl || true
+  make install-deps 2>/dev/null || true
+  make build 2>/dev/null || true
+  pip install dist/vppcfg-*.whl 2>/dev/null || true
   deactivate
-  echo "vppcfg installed"
+  cd /
 else
-  echo "Warning: vppcfg clone failed"
+  echo "Warning: vppcfg not available"
 fi
 
-echo "Applying FloofOS Tuning..."
-cat > /etc/sysctl.d/99-floofos.conf <<EOF
-# FloofOS Routing and Forwarding Configuration
-# Production-grade network tuning for BGP router
-
-# File system limits
+echo "[7/7] Applying system configuration..."
+cat > /etc/sysctl.d/99-floofos.conf <<'EOF'
 fs.file-max = 16777216
 fs.nr_open = 16777216
 kernel.hung_task_timeout_secs = 60
 kernel.msgmax = 65536
 kernel.msgmnb = 65536
-
-# Network core settings
 net.core.default_qdisc = cake
 net.core.netdev_max_backlog = 30000
 net.core.rmem_default = 67108864
 net.core.rmem_max = 67108864
 net.core.somaxconn = 65536
 net.core.wmem_max = 67108864
-
-# IPv4 forwarding and routing
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.all.accept_source_route = 0
 net.ipv4.conf.all.arp_announce = 1
@@ -123,8 +115,6 @@ net.ipv4.neigh.default.gc_thresh1 = 1024
 net.ipv4.neigh.default.gc_thresh2 = 8192
 net.ipv4.neigh.default.gc_thresh3 = 16384
 net.ipv4.route.max_size = 1073741824
-
-# TCP optimization
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_dsack = 1
 net.ipv4.tcp_fin_timeout = 30
@@ -141,8 +131,6 @@ net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_wmem = 4096 16384 16777216
-
-# IPv6 forwarding and routing
 net.ipv6.conf.all.accept_ra = 0
 net.ipv6.conf.all.accept_ra_defrtr = 0
 net.ipv6.conf.all.accept_ra_pinfo = 0
@@ -160,29 +148,25 @@ net.ipv6.neigh.default.gc_thresh1 = 1024
 net.ipv6.neigh.default.gc_thresh2 = 8192
 net.ipv6.neigh.default.gc_thresh3 = 16384
 net.ipv6.route.max_size = 32768000
-
-# VM tuning
 vm.max_map_count = 1048575
 vm.swappiness = 10
 EOF
 
-echo "Enabling services..."
-systemctl enable netns-dataplane || true
-systemctl enable rsyslog || true
-systemctl enable vpp-snmp-agent || true
-systemctl enable ssh-dataplane || true
-systemctl enable bird-dataplane || true
-systemctl enable vpp-auto-config || true
-systemctl disable nftables || true
-systemctl disable snmpd || true
+systemctl enable netns-dataplane 2>/dev/null || true
+systemctl enable rsyslog 2>/dev/null || true
+systemctl enable vpp-snmp-agent 2>/dev/null || true
+systemctl enable ssh-dataplane 2>/dev/null || true
+systemctl enable bird-dataplane 2>/dev/null || true
+systemctl enable vpp-auto-config 2>/dev/null || true
+systemctl disable nftables 2>/dev/null || true
+systemctl disable snmpd 2>/dev/null || true
 
-# Mask conflicting services
 for svc in bird snmpd; do
   systemctl stop $svc 2>/dev/null || true
   systemctl disable $svc 2>/dev/null || true
   systemctl mask $svc 2>/dev/null || true
 done
 
-chmod +x /usr/bin/floof-cli || true
 chmod +x /usr/local/bin/* 2>/dev/null || true
 
+echo "FloofOS Installation Complete"
