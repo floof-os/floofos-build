@@ -10,7 +10,7 @@ set -e
 
 cd /build
 
-lb clean
+lb clean --purge
 
 lb config
 

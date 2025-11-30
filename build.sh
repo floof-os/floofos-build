@@ -10,7 +10,7 @@ set -e
 
 IMAGE_NAME="floofos-builder"
 
-docker build -t $IMAGE_NAME .
+docker build --no-cache -t $IMAGE_NAME .
 
 docker run --privileged --rm \
     -v "$(pwd):/build" \
