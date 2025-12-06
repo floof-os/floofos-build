@@ -12,7 +12,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates locales tzdata openvswitch-switch ethtool vlan bridge-utils \
     htop iotop sysstat procps rsyslog nftables fail2ban snmp snmpd \
     libsnmp-dev libnl-3-dev libnl-route-3-dev systemd-sysv \
-    parted dosfstools grub-efi-amd64 grub-pc-bin
+    parted dosfstools grub-efi-amd64 grub-pc-bin uuid-runtime dmidecode
 
 cd /tmp
 wget -q https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
@@ -45,11 +45,11 @@ fi
 
 git clone --depth 1 https://github.com/floof-os/floofos-cli.git /tmp/floofos-cli 2>/dev/null || true
 if [ -d /tmp/floofos-cli ]; then
-    cd /tmp/floofos-cli
+        cd /tmp/floofos-cli
     /usr/local/go/bin/go build -o /usr/bin/floof-cli ./cmd/floofctl 2>/dev/null || true
     chmod +x /usr/bin/floof-cli 2>/dev/null || true
-    cd /
-    rm -rf /tmp/floofos-cli
+        cd /
+        rm -rf /tmp/floofos-cli
 fi
 
 cd /opt
@@ -78,8 +78,27 @@ if [ -d vppcfg ]; then
 fi
 
 mkdir -p /var/log/vpp /var/log/floofctl /etc/floofctl /etc/vpp/config /etc/nftables.d /etc/vpp-snmp-agent
+mkdir -p /etc/floofos-config/commits
 
 [ -f /etc/network/interfaces ] && mv /etc/network/interfaces /etc/network/interfaces.orig
+
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/99-floofos-unmanaged.conf << 'EOF'
+[keyfile]
+unmanaged-devices=interface-name:eth*;interface-name:en*;interface-name:ens*;interface-name:enp*
+EOF
+
+mkdir -p /etc/systemd/network
+cat > /etc/systemd/network/99-floofos-ignore.network << 'EOF'
+[Match]
+Name=eth* en* ens* enp*
+
+[Link]
+Unmanaged=yes
+EOF
+
+systemctl mask NetworkManager 2>/dev/null || true
+systemctl mask systemd-networkd 2>/dev/null || true
 
 sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
@@ -95,9 +114,9 @@ usermod -aG bird,vpp root 2>/dev/null || true
 
 pathvector generate 2>/dev/null || true
 
-systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-auto-config vpp vpp-lcp-setup 2>/dev/null || true
+systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp vpp-lcp-setup 2>/dev/null || true
 
-for svc in bird snmpd nftables; do
+for svc in bird snmpd nftables NetworkManager systemd-networkd; do
     systemctl disable $svc 2>/dev/null || true
     systemctl mask $svc 2>/dev/null || true
 done
