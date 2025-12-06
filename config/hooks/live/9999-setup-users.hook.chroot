@@ -1,0 +1,18 @@
+#!/bin/sh
+
+echo "root:floofos" | chpasswd
+
+if ! id floofos >/dev/null 2>&1; then
+    useradd -m -s /bin/bash -G sudo,netdev floofos
+    echo "floofos:floofos" | chpasswd
+fi
+
+if [ -d /etc/skel ]; then
+    cp -r /etc/skel/. /home/floofos/ 2>/dev/null || true
+    chown -R floofos:floofos /home/floofos
+fi
+
+usermod -aG bird,vpp floofos 2>/dev/null || true
+usermod -aG bird,vpp root 2>/dev/null || true
+
+echo "User setup: floofos/floofos, root/floofos"

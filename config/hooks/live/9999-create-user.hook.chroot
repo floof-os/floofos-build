@@ -1,9 +1,0 @@
-#!/bin/sh
-# Live-config hook: Create FloofOS user with password
-
-# Create floofos user with password
-if ! id floofos >/dev/null 2>&1; then
-    useradd -m -s /bin/bash -G sudo,netdev floofos
-    echo "floofos:floofos" | chpasswd
-    echo "FloofOS user created: floofos/floofos"
-fi
