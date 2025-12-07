@@ -114,7 +114,7 @@ usermod -aG bird,vpp root 2>/dev/null || true
 
 pathvector generate 2>/dev/null || true
 
-systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp vpp-lcp-setup 2>/dev/null || true
+systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp 2>/dev/null || true
 
 for svc in bird snmpd nftables NetworkManager systemd-networkd; do
     systemctl disable $svc 2>/dev/null || true
