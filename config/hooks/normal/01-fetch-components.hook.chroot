@@ -53,13 +53,20 @@ if [ -d /tmp/floofos-cli ]; then
 fi
 
 cd /opt
-git clone --depth 1 https://git.ipng.ch/ipng/vpp-snmp-agent.git 2>/dev/null || true
-if [ -d vpp-snmp-agent ]; then
-    cd vpp-snmp-agent
-    /usr/local/go/bin/go build -o vpp-snmp-agent . 2>/dev/null || true
-    [ -f vpp-snmp-agent ] && cp vpp-snmp-agent /usr/local/bin/ && chmod +x /usr/local/bin/vpp-snmp-agent
+git clone --depth 1 https://git.ipng.ch/ipng/govpp-snmp-agentx.git || true
+if [ -d govpp-snmp-agentx ]; then
+    cd govpp-snmp-agentx
+    export CGO_ENABLED=0
+    export GOPROXY=https://proxy.golang.org,direct
+    cd src
+    /usr/local/go/bin/go mod download || true
+    /usr/local/go/bin/go build -o govpp-snmp-agentx . || echo "Warning: govpp-snmp-agentx build failed"
+    if [ -f govpp-snmp-agentx ]; then
+        cp govpp-snmp-agentx /usr/local/bin/vpp-snmp-agent
+        chmod +x /usr/local/bin/vpp-snmp-agent
+    fi
     cd /opt
-    rm -rf vpp-snmp-agent
+    rm -rf govpp-snmp-agentx
 fi
 
 cd /etc
