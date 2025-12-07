@@ -125,7 +125,7 @@ pathvector generate 2>/dev/null || true
 
 systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp 2>/dev/null || true
 
-for svc in bird snmpd nftables NetworkManager systemd-networkd; do
+for svc in NetworkManager systemd-networkd bird snmpd nftables; do
     systemctl disable $svc 2>/dev/null || true
     systemctl mask $svc 2>/dev/null || true
 done
