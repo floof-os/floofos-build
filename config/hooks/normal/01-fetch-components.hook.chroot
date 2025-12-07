@@ -112,6 +112,8 @@ usermod -aG bird,vpp root 2>/dev/null || true
 [ -f /etc/skel/.bashrc ] && cp /etc/skel/.bashrc /home/floofos/.bashrc && chown floofos:floofos /home/floofos/.bashrc
 [ -f /etc/skel/.bash_aliases ] && cp /etc/skel/.bash_aliases /home/floofos/.bash_aliases && chown floofos:floofos /home/floofos/.bash_aliases
 
+chmod 0440 /etc/sudoers.d/* 2>/dev/null || true
+
 pathvector generate 2>/dev/null || true
 
 systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp 2>/dev/null || true
