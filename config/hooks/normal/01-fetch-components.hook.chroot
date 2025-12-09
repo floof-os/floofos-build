@@ -84,7 +84,7 @@ if [ -d vppcfg ]; then
     cd /
 fi
 
-mkdir -p /var/log/vpp /var/log/floofctl /etc/floofctl /etc/vpp/config /etc/nftables.d /etc/vpp-snmp-agent
+mkdir -p /var/log/vpp /var/log/floofctl /etc/floofctl /etc/vpp/config /etc/nftables.d /var/run/agentx
 mkdir -p /etc/floofos-config/commits
 
 [ -f /etc/network/interfaces ] && mv /etc/network/interfaces /etc/network/interfaces.orig
