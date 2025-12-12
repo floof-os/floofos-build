@@ -26,6 +26,8 @@ lb config noauto \
     --system live \
     --mode debian \
     --memtest none \
-    --win32-loader false
+    --win32-loader false \
+    --binary-images iso-hybrid \
+    --hdd-size 4096
 
 lb build
