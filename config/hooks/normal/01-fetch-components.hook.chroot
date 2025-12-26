@@ -123,7 +123,7 @@ chmod 0440 /etc/sudoers.d/* 2>/dev/null || true
 
 pathvector generate 2>/dev/null || true
 
-systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp 2>/dev/null || true
+systemctl enable netns-dataplane rsyslog ssh-dataplane bird-dataplane vpp-dpdk-bind vpp-auto-config vpp floofos-boot-banner 2>/dev/null || true
 
 for svc in NetworkManager systemd-networkd bird snmpd nftables; do
     systemctl disable $svc 2>/dev/null || true
@@ -137,6 +137,7 @@ chmod 755 /var/log/floofctl
 echo "" > /etc/motd
 rm -rf /etc/update-motd.d/* /etc/motd.d/* /etc/debian_version 2>/dev/null || true
 echo "1.0" > /etc/floofos-version
+echo "1.0" > /etc/floofos-release
 
 rm -rf /root/go /tmp/* 2>/dev/null || true
 apt-get clean
